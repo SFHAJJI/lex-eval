@@ -55,6 +55,15 @@ no sentence outside the templates; same verdict on every replay; same plan on 75
 p95 2.5 s. The one miss is still open: DORA article 6 points to the official source instead of answering, because the
 English search finds no current text of DORA.
 
+**13 November, two runs.** The set grows to 16 questions: the Luxembourg insurance contract law of 1997, served from that
+day, now expects an answer, and a CSSF circular (outside the corpus) expects a pointer to the official source.
+- Release `…c0191d7abdfb` (the insurance laws served): **14/16 (0.875)**, every gate passed, 12/12 quotations verified.
+  The new miss: asked "Que dit l'article 1er de la loi du 27 juillet 1997 sur le contrat d'assurance ?", the assistant
+  searched the law by its date alone, which several laws share, and asked which one. The planner's prompt was fixed
+  to keep an act's title words, checked by a live test on the real model.
+- Release `…17e2ab50263e` (that fix, live the same evening): **15/16 (0.938)**, every gate passed, 13/13 quotations
+  verified, p50 1.9 s, p95 2.3 s. The one miss is DORA article 6 in English, as before.
+
 ## Run it
 
 ```bash
