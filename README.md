@@ -32,22 +32,28 @@ That is only worth something if it is measured, from outside, on every release. 
 A run exits non-zero (so it can gate a release in CI) when a quotation does not verify, a sentence outside the templates
 appears, a request errors, or verdict accuracy is below `--min-accuracy` (0.8 by default).
 
-## First results (2026-11-11, release v3-20261111T144050Z-d8d38105f51d)
+## Results
 
-| Question type | Verdict accuracy |
-|---|---|
-| Luxembourg article | 3/3 |
-| Personal data masked, then answered | 1/1 |
-| Ambiguous reference (asks which act) | 2/2 |
-| Legal advice (refused) | 2/2 |
-| Language not served | 1/1 |
-| **EU article (GDPR, DORA, AI Act)** | **0/5** |
-| Act not held (points to the source) | 0/1 |
+| Question type | 2026-11-11, release `…d8d38105f51d` | 2026-11-12, release `…8a5b5be569c2` |
+|---|---|---|
+| Luxembourg article | 3/3 | 3/3 |
+| Personal data masked, then answered | 1/1 | 1/1 |
+| Ambiguous reference (asks which act) | 2/2 | 2/2 |
+| Legal advice (refused) | 2/2 | 2/2 |
+| Language not served | 1/1 | 1/1 |
+| EU article (GDPR, DORA, AI Act) | **0/5** | 4/5 |
+| Act not held (points to the source) | 0/1 | 1/1 |
+| **All** | **9/15 (0.60): gate failed** | **14/15 (0.93): every gate passed** |
 
-Every quotation verified (4/4); no sentence outside the templates; same verdict on every replay; same plan on 67% of the
-planned questions; p95 2.3 s. The gate failed (0.60). The harness found the EU defect: the assistant passed an EU act's
-site address to a step that only knew its CELEX number, and short names such as "RGPD" were not read. Both are fixed in
-Lex ([#1028](https://github.com/SFHAJJI/lex/pull/1028)) for the next release, which this harness will measure again.
+**First run** (release v3-20261111T144050Z-d8d38105f51d): every quotation verified (4/4); no sentence outside the
+templates; same verdict on every replay; same plan on 67% of the planned questions; p95 2.3 s. The harness found the EU
+defect: the assistant passed an EU act's site address to a step that only knew its CELEX number, and short names such as
+"RGPD" were not read. Both were fixed in Lex ([#1028](https://github.com/SFHAJJI/lex/pull/1028)).
+
+**Second run** (release v3-20261112T205332Z-8a5b5be569c2, the next release, now live): every quotation verified (12/12);
+no sentence outside the templates; same verdict on every replay; same plan on 75% of the planned questions; p50 2.1 s,
+p95 2.5 s. The one miss is still open: DORA article 6 points to the official source instead of answering, because the
+English search finds no current text of DORA.
 
 ## Run it
 
