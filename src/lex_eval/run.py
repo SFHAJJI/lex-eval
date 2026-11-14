@@ -180,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
         mlflow.set_tags({"gates": "passed" if not failed else "failed", "harness": "lex-eval 0.2.0", "split": args.split})
         # One trace per question: the plan, each operation, the search's first hits and best hit, the article chosen.
         mlflow.log_text("\n".join(json.dumps(t, ensure_ascii=False) for t in traces) + "\n", "traces.jsonl")
+        summary = summary_markdown(results, metrics, facts, failed)
+        mlflow.log_text(summary, "summary.md")
+        mlflow.log_text("\n".join(json.dumps(r.row(), ensure_ascii=False) for r in results) + "\n", "results.jsonl")
         if args.out_dir is not None:
             args.out_dir.mkdir(parents=True, exist_ok=True)
             (args.out_dir / "summary.md").write_text(summary, encoding="utf-8")
@@ -187,9 +190,6 @@ def main(argv: list[str] | None = None) -> int:
             (args.out_dir / "traces.jsonl").write_text("\n".join(json.dumps(t, ensure_ascii=False) for t in traces) + "\n", encoding="utf-8")
             (args.out_dir / "run.json").write_text(json.dumps({"run_id": run.info.run_id, "metrics": metrics, "facts": facts,
                                                               "failed": failed}, ensure_ascii=False, indent=2), encoding="utf-8")
-        summary = summary_markdown(results, metrics, facts, failed)
-        mlflow.log_text(summary, "summary.md")
-        mlflow.log_text("\n".join(json.dumps(r.row(), ensure_ascii=False) for r in results) + "\n", "results.jsonl")
         if args.register:
             from .registry import LexAssistantModel
 

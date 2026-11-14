@@ -131,3 +131,20 @@ def test_the_shipped_v2_cases_have_the_insurance_suite_and_an_article_for_each_c
     insurance = [c for c in cases if c.suite == "insurance"]
     assert len(cases) >= 55 and len(insurance) >= 20
     assert all(c.expect_anchor for c in cases if c.question_type.startswith("concept_"))
+
+
+def test_a_run_writes_its_summary_results_and_traces_to_the_out_dir(tmp_path, monkeypatch):
+    # The crash of 2026-11-14: the out-dir block used the summary before it was built, so a passing run exited 1.
+    from lex_eval import run as runner
+    from lex_eval.score import CaseResult
+    result = CaseResult(id="a", question_type="t", expected="refuse", verdict="refuse", verdict_ok=True, citation_expected=False,
+                        citation_ok=None, quotes=0, quotes_verified=0, non_template_strings=0, replay_identical=True,
+                        replay_same_plan=None, seconds=1.0, outcome="right_behaviour")
+    monkeypatch.setattr(runner, "evaluate", lambda client, cases, replay: ([result], {"serving_commit": "x"}, [{"id": "a", "cost_eur_estimate": 0.0}]))
+    cases = tmp_path / "cases.jsonl"
+    cases.write_text('{"id": "a", "question": "q", "expect_verdict": "refuse", "question_type": "t"}\n', encoding="utf-8")
+    out = tmp_path / "out"
+    code = runner.main(["--cases", str(cases), "--tracking-uri", f"sqlite:///{tmp_path / 'm.db'}", "--out-dir", str(out), "--gate-suite", ""])
+    assert code == 0
+    assert (out / "summary.md").read_text(encoding="utf-8").startswith("# lex-eval run")
+    assert (out / "results.jsonl").exists() and (out / "traces.jsonl").exists() and (out / "run.json").exists()
