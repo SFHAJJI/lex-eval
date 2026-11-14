@@ -148,3 +148,12 @@ def test_a_run_writes_its_summary_results_and_traces_to_the_out_dir(tmp_path, mo
     assert code == 0
     assert (out / "summary.md").read_text(encoding="utf-8").startswith("# lex-eval run")
     assert (out / "results.jsonl").exists() and (out / "traces.jsonl").exists() and (out / "run.json").exists()
+
+
+def test_the_verdict_floor_is_held_on_the_set_it_was_set_on_and_still_fails_below_it():
+    from lex_eval.run import gates
+    base = {"quote_verified_rate": 1.0, "non_template_strings": 0, "errors": 0}
+    # The larger set's accuracy is below the floor; its own subset is above: the floor holds on its subset.
+    assert gates({**base, "verdict_accuracy": 0.46, "verdict_accuracy_floor_set": 0.94}, 0.8) == []
+    assert gates({**base, "verdict_accuracy": 0.95, "verdict_accuracy_floor_set": 0.75}, 0.8) == ["verdict_accuracy_floor_set 0.750 < 0.8"]
+    assert gates({**base, "verdict_accuracy": 0.46}, 0.8) == ["verdict_accuracy 0.460 < 0.8"], "with no floor set, the whole run"

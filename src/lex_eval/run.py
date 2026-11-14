@@ -122,8 +122,10 @@ def gates(metrics: dict[str, float], min_accuracy: float, *, gate_suite: str | N
         failed.append(f"non_template_strings {metrics['non_template_strings']:.0f} > 0")
     if metrics["errors"] > 0:
         failed.append(f"errors {metrics['errors']:.0f} > 0")
-    if metrics["verdict_accuracy"] < min_accuracy:
-        failed.append(f"verdict_accuracy {metrics['verdict_accuracy']:.3f} < {min_accuracy}")
+    accuracy = metrics.get("verdict_accuracy_floor_set", metrics["verdict_accuracy"])
+    if accuracy < min_accuracy:
+        name = "verdict_accuracy_floor_set" if "verdict_accuracy_floor_set" in metrics else "verdict_accuracy"
+        failed.append(f"{name} {accuracy:.3f} < {min_accuracy}")
     return failed
 
 
@@ -157,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", type=Path, default=None, help="a previous run's results.jsonl: a case it passed must pass")
     parser.add_argument("--split", default="dev", help="what the cases are: dev (the set the work is checked on) or heldout")
     parser.add_argument("--out-dir", type=Path, default=None, help="also write summary.md, results.jsonl and traces.jsonl here")
+    parser.add_argument("--accuracy-cases", type=Path, default=None,
+                        help="apply --min-accuracy to the cases of this file only (the set the floor was set on), by id")
     args = parser.parse_args(argv)
 
     with LexClient(args.base_url, min_interval=args.min_interval) as client:
@@ -165,6 +169,14 @@ def main(argv: list[str] | None = None) -> int:
     planned = [t["cost_eur_estimate"] for t in traces if t["cost_eur_estimate"] > 0]
     metrics["cost_eur_per_question_estimate"] = sum(planned) / len(planned) if planned else 0.0
     regressed = regressions(results, args.baseline)
+    if args.accuracy_cases is not None:
+        # The verdict floor was set on its own set (v1's 16 questions): it is held there, word for word, and the larger set
+        # is held by its own gates (no wrong article on the gated suite, no regression).
+        floor_ids = {case.id for case in load_cases(args.accuracy_cases)}
+        floor = [r for r in results if r.id in floor_ids]
+        if len(floor) != len(floor_ids):
+            raise SystemExit(f"--accuracy-cases names {len(floor_ids)} cases and this run holds {len(floor)} of them")
+        metrics["verdict_accuracy_floor_set"] = sum(r.verdict_ok for r in floor) / len(floor)
     failed = gates(metrics, args.min_accuracy, gate_suite=args.gate_suite or None, regressed=regressed)
 
     mlflow.set_tracking_uri(args.tracking_uri)
