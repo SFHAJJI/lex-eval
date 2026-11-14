@@ -38,6 +38,11 @@ class CaseResult:
     error: str | None = None
     plan_sha256: str | None = None
     notes: list[str] = field(default_factory=list)
+    suite: str = "general"
+    # What kind of result it is (OUTCOMES): the headline is "wrong_article", whose target is zero.
+    outcome: str = "right_behaviour"
+    chosen_work: str | None = None
+    chosen_article: str | None = None
 
     def row(self) -> dict[str, Any]:
         return asdict(self)
@@ -141,7 +146,12 @@ def score_case(
         # The same verdict twice; and, when the planner ran, the same plan (temperature 0 does not promise it).
         replay_identical = verdict == verdict_of(replay)
         replay_same_plan = None if plan is None else plan == trace_of(replay).get("plan_sha256")
+    chosen_work, chosen_article = chosen_of(first)
     return CaseResult(
+        suite=case.suite,
+        outcome=outcome_of(case, verdict, quotes, citation_ok, error),
+        chosen_work=chosen_work,
+        chosen_article=chosen_article,
         id=case.id,
         question_type=case.question_type,
         expected=case.expect_verdict,
@@ -158,6 +168,68 @@ def score_case(
         error=error,
         plan_sha256=plan,
     )
+
+
+# The kinds of result a case can have. For a case that expects an article: the right article, a wrong article (an answer
+# that quotes another article or act: the failure that matters most, target zero), not found (no answer: a precision asked,
+# a pointer, no quotation) or wrongly refused (refused as advice, or no language); and an error. For any other case: the
+# right behaviour or the wrong one.
+OUTCOMES = ("right_article", "wrong_article", "not_found", "wrongly_refused", "right_behaviour", "wrong_behaviour", "error")
+ANSWERS = frozenset({"answer", "answer_with_enrichment"})
+
+
+def outcome_of(case: Case, verdict: str | None, quotes: list[Quote], citation_ok: bool | None, error: str | None) -> str:
+    if error is not None:
+        return "error"
+    if case.expect_work is not None:
+        if verdict in ANSWERS and citation_ok:
+            return "right_article"
+        if verdict in ANSWERS and quotes:
+            return "wrong_article"
+        if verdict in {"refuse", "localization_unavailable"}:
+            return "wrongly_refused"
+        return "not_found"
+    return "right_behaviour" if verdict == case.expect_verdict else "wrong_behaviour"
+
+
+def chosen_of(envelope: dict[str, Any]) -> tuple[str | None, str | None]:
+    """The act and article the answer chose: the first quotation's, as its permalink and anchor name them."""
+    quotes = quotes_of(envelope)
+    if not quotes:
+        return None, None
+    parts = quotes[0].permalink.split("/")
+    work = "/".join(parts[:3]) if len(parts) > 2 else None
+    return work, quotes[0].anchor
+
+
+def search_step(envelope: dict[str, Any]) -> dict[str, Any] | None:
+    """The parameters of the plan's first search step, as the trace records them after binding."""
+    for step in trace_of(envelope).get("steps") or []:
+        if step.get("operation_id") == "search" and isinstance(step.get("parameters"), dict):
+            return step["parameters"]
+    return None
+
+
+def trace_record(case: Case, result: "CaseResult", envelope: dict[str, Any], search: dict[str, Any] | None) -> dict[str, Any]:
+    """One question's trace for the run's artifacts: the plan, each operation run, the search's first hits and its best-hit
+    decision (the same search asked again by the harness), and the article chosen."""
+    trace = trace_of(envelope)
+    steps = [{key: step.get(key) for key in ("step_id", "operation_id", "parameters", "outcome", "verdict", "refusal_code")}
+             for step in trace.get("steps") or []]
+    hits = None
+    best = None
+    if search is not None:
+        value = answer_value(search) or {}
+        hits = [{"work": hit.get("work_key") or hit.get("celex"), "article": hit.get("publisher_id"), "lane": hit.get("lane")}
+                for hit in (value.get("hits") or [])[:3]]
+        best_hit = value.get("best_hit") or {}
+        best = {"decision": best_hit.get("decision"), "hit": best_hit.get("hit")}
+    return {
+        "id": case.id, "question": case.question, "suite": case.suite, "expected": {"verdict": case.expect_verdict,
+        "work": case.expect_work, "article": case.expect_anchor}, "verdict": result.verdict, "outcome": result.outcome,
+        "planner_id": trace.get("planner_id"), "plan": trace.get("plan"), "steps": steps, "search_hits": hits,
+        "best_hit": best, "chosen": {"work": result.chosen_work, "article": result.chosen_article}, "seconds": result.seconds,
+    }
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -194,4 +266,11 @@ def aggregate(results: list[CaseResult]) -> dict[str, float]:
         by_type[r.question_type].append(r)
     for question_type, group in sorted(by_type.items()):
         metrics[f"verdict_accuracy.{question_type}"] = sum(r.verdict_ok for r in group) / len(group)
+    # Per kind of result, overall and per suite: "wrong_article" is the headline, and its target is zero.
+    for outcome in OUTCOMES:
+        metrics[f"outcome.{outcome}"] = sum(1 for r in results if r.outcome == outcome)
+    for suite in sorted({r.suite for r in results}):
+        group = [r for r in results if r.suite == suite]
+        for outcome in OUTCOMES:
+            metrics[f"outcome.{outcome}.{suite}"] = sum(1 for r in group if r.outcome == outcome)
     return metrics

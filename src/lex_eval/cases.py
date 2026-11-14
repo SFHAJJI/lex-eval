@@ -20,6 +20,8 @@ class Case:
     expect_work: str | None = None
     expect_anchor: str | None = None
     note: str = ""
+    # The subset a case belongs to, for the gates that read one subset ("insurance": the 1997 insurance-contract law).
+    suite: str = "general"
 
     def __post_init__(self) -> None:
         if self.expect_verdict not in VERDICTS:
@@ -37,6 +39,13 @@ def load_cases(path: str | Path) -> list[Case]:
         if not line.strip():
             continue
         raw = json.loads(line)
+        # The held-out file (heldout-v1.jsonl, fixed by its SHA-256 before any run) names the article "expect_article" and
+        # its subset "set", and gives no question type: read as the same fields, never by rewriting the file.
+        if "expect_article" in raw:
+            raw["expect_anchor"] = raw.pop("expect_article")
+        if "set" in raw:
+            raw["suite"] = raw.pop("set")
+        raw.setdefault("question_type", "heldout")
         case = Case(**raw)
         if case.id in seen:
             raise ValueError(f"line {number}: duplicate case id {case.id}")

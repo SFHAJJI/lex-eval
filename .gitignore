@@ -6,3 +6,5 @@ mlruns/
 mlartifacts/
 .pytest_cache/
 .ruff_cache/
+runs/
+run-*.log
