@@ -1,0 +1,72 @@
+name: nightly
+
+# The nightly quality check of the live Lex assistant (the owner's yes of 2026-11-15). Every night, from GitHub's runners,
+# the 56 test questions are asked of https://law.soufien.lu and scored as at release time: no wrong article on the
+# insurance questions, no question the baseline passed failing, every quotation verified against the published text, the
+# verdict floor held on the first 16 questions. A failed gate opens one issue, or adds this run to the open one; the
+# summary and the per-question results are kept as the run's artifact. The release gate checks a version once; this checks
+# the live version every night, because the model's plans vary (the same plan 64 % of the time when asked twice).
+# Cost: about 0.1 EUR a night, within the model's 20 EUR monthly cap. It sends only the test questions; it needs no secret.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: "Lex nightly check: a quality gate failed on the live site"
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Ask the live site the 56 test questions
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+          PYTHONIOENCODING: utf-8
+        run: |
+          set -o pipefail
+          lex-eval --base-url https://law.soufien.lu \
+            --cases cases/lex-assistant-v2.jsonl --split dev --gate-suite insurance \
+            --accuracy-cases cases/lex-assistant-v1.jsonl --baseline baselines/live.jsonl \
+            --tracking-uri "sqlite:///$RUNNER_TEMP/nightly.db" --out-dir "$RUNNER_TEMP/nightly" | tee "$RUNNER_TEMP/nightly.log"
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/nightly/summary.md" ]; then cat "$RUNNER_TEMP/nightly/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ github.run_id }}
+          path: ${{ runner.temp }}/nightly
+          retention-days: 30
+      - name: Open or add to the issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="The nightly check failed a gate: $RUN_URL (summary and per-question results in the run's artifact)."
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$ISSUE_TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$ISSUE_TITLE" --body "$body"
+          fi

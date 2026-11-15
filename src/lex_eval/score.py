@@ -210,7 +210,7 @@ def search_step(envelope: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def trace_record(case: Case, result: "CaseResult", envelope: dict[str, Any], search: dict[str, Any] | None) -> dict[str, Any]:
+def trace_record(case: Case, result: CaseResult, envelope: dict[str, Any], search: dict[str, Any] | None) -> dict[str, Any]:
     """One question's trace for the run's artifacts: the plan, each operation run, the search's first hits and its best-hit
     decision (the same search asked again by the harness), and the article chosen."""
     trace = trace_of(envelope)

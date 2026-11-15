@@ -27,6 +27,19 @@ That is only worth something if it is measured, from outside, on every release. 
 - **Registry:** with `--register`, the evaluated configuration becomes a version of the model `lex-assistant`, tagged with
   the release; it gets the alias `champion` only when every gate passes.
 
+## Every night, against the live site
+
+`.github/workflows/nightly.yml` asks the live site the 56 test questions every night, with the release gates (no wrong
+article on the insurance questions, no question of `baselines/live.jsonl` that passed failing, every quotation verified).
+A failed gate opens one issue, or adds the run to the open one; the summary and the per-question results are kept as the
+run's artifact. The release gate checks a version once; this checks the live version every night, because the model's
+plans vary. It costs about 0.1 EUR a night.
+
+## The registry, exported for the site
+
+`python -m lex_eval.export_registry OUT.json` writes the registered model, its aliases, and every version with its tags,
+its run's parameters, metrics and logged artifacts, with MLflow's own client. Lex's "How it works" page shows that export.
+
 ## Gates
 
 A run exits non-zero (so it can gate a release in CI) when a quotation does not verify, a sentence outside the templates

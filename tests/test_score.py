@@ -78,8 +78,8 @@ def test_metrics_are_reported_per_question_type():
 
 def _case(**kw):
     from lex_eval.cases import Case
-    base = dict(id="c", question="q", expect_verdict="answer", question_type="t", expect_work="/lu-legilux/loi-1997-07-27-n10",
-                expect_anchor="art_44", suite="insurance")
+    base = {"id": "c", "question": "q", "expect_verdict": "answer", "question_type": "t", "expect_work": "/lu-legilux/loi-1997-07-27-n10",
+            "expect_anchor": "art_44", "suite": "insurance"}
     base.update(kw)
     return Case(**base)
 
