@@ -100,10 +100,23 @@ def trace_of(envelope: dict[str, Any]) -> dict[str, Any]:
     return trace if isinstance(trace, dict) else {}
 
 
+def article_number(anchor: str | None) -> str | None:
+    """An article as its number alone, so that an expectation written as a number ("26", "17", the held-out file's
+    form) meets the anchor an answer carries ("art_26" for a Luxembourg act, "017" for an EU act, "art_1er")."""
+    if anchor is None:
+        return None
+    number = anchor.strip().lower()
+    for prefix in ("article_", "art_"):
+        if number.startswith(prefix):
+            number = number[len(prefix):]
+    number = number.lstrip("0") or "0"
+    return "1" if number in ("1er", "premier") else number
+
+
 def cites(quote: Quote, work: str, anchor: str | None, text: str | None = None) -> bool:
     if not quote.permalink.startswith(work.rstrip("/") + "/"):
         return False
-    if anchor is not None and quote.anchor != anchor:
+    if anchor is not None and quote.anchor != anchor and article_number(quote.anchor) != article_number(anchor):
         return False
     # The expected words, compared with both apostrophes read as one (the publisher writes both in one law).
     return text is None or text.replace("’", "'") in quote.text.replace("’", "'")

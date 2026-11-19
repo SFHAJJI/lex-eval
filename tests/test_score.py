@@ -157,3 +157,21 @@ def test_the_verdict_floor_is_held_on_the_set_it_was_set_on_and_still_fails_belo
     assert gates({**base, "verdict_accuracy": 0.46, "verdict_accuracy_floor_set": 0.94}, 0.8) == []
     assert gates({**base, "verdict_accuracy": 0.95, "verdict_accuracy_floor_set": 0.75}, 0.8) == ["verdict_accuracy_floor_set 0.750 < 0.8"]
     assert gates({**base, "verdict_accuracy": 0.46}, 0.8) == ["verdict_accuracy 0.460 < 0.8"], "with no floor set, the whole run"
+
+
+def test_an_article_written_as_a_number_meets_the_anchor_an_answer_carries():
+    # The held-out file writes the expected article as its number ("26", "17"); an answer carries the publisher's anchor
+    # ("art_26" for a Luxembourg act, "017" for an EU act). Read as two different articles, ten right answers of the
+    # held-out run of 2026-11-19 were counted wrong.
+    from lex_eval.score import Quote, article_number, cites
+
+    assert article_number("art_26") == article_number("26") == "26"
+    assert article_number("017") == article_number("17") == "17"
+    assert article_number("art_1er") == article_number("1") == "1"
+    assert article_number("article_15-1") == article_number("15-1") == "15-1"
+    assert article_number("art_62-3") != article_number("62")
+    quote = Quote("/lu-legilux/loi-1997-07-27-n10/2025-11-25--abc/fra#art_26", None, "art_26", "le texte")
+    assert cites(quote, "/lu-legilux/loi-1997-07-27-n10", "26")
+    assert cites(quote, "/lu-legilux/loi-1997-07-27-n10", "art_26")
+    assert not cites(quote, "/lu-legilux/loi-1997-07-27-n10", "27")
+    assert not cites(quote, "/lu-legilux/loi-1997-07-27-n10", "126")
