@@ -64,7 +64,12 @@ class LexClient:
         for attempt in range(2):
             self._pace()
             started = self._clock()
-            response = self._http.post(f"/api/v3/{operation}", json=payload)
+            try:
+                response = self._http.post(f"/api/v3/{operation}", json=payload)
+            except httpx.TransportError:
+                # No answer within the deadline, or the connection failed: an error of this request (status 0), which the
+                # run counts and its gate refuses. The run goes on: one slow answer must not lose every other result.
+                return Timed(body={}, status=0, seconds=self._clock() - started)
             seconds = self._clock() - started
             if response.status_code == 429 and attempt == 0:
                 self._sleep(60)

@@ -18,6 +18,7 @@ class Quote:
     permalink: str
     text_sha256: str | None
     anchor: str | None
+    text: str = ""
 
 
 @dataclass
@@ -88,7 +89,8 @@ def quotes_of(envelope: dict[str, Any]) -> list[Quote]:
     found = []
     for node in _walk(value.get("parts")):
         if node.get("kind") == "quote" and isinstance(node.get("article_permalink"), str):
-            found.append(Quote(node["article_permalink"], node.get("article_text_sha256"), node.get("anchor")))
+            found.append(Quote(node["article_permalink"], node.get("article_text_sha256"), node.get("anchor"),
+                               node.get("text") if isinstance(node.get("text"), str) else ""))
     return found
 
 
@@ -98,10 +100,13 @@ def trace_of(envelope: dict[str, Any]) -> dict[str, Any]:
     return trace if isinstance(trace, dict) else {}
 
 
-def cites(quote: Quote, work: str, anchor: str | None) -> bool:
+def cites(quote: Quote, work: str, anchor: str | None, text: str | None = None) -> bool:
     if not quote.permalink.startswith(work.rstrip("/") + "/"):
         return False
-    return anchor is None or quote.anchor == anchor
+    if anchor is not None and quote.anchor != anchor:
+        return False
+    # The expected words, compared with both apostrophes read as one (the publisher writes both in one law).
+    return text is None or text.replace("’", "'") in quote.text.replace("’", "'")
 
 
 def quote_verifies(quote: Quote, verify_envelope: dict[str, Any]) -> bool:
@@ -125,7 +130,9 @@ def score_case(
 ) -> CaseResult:
     verdict = verdict_of(first)
     error = None
-    if status != 200:
+    if status == 0:
+        error = "no_answer_in_time"
+    elif status != 200:
         error = f"http {status}"
     elif verdict == "rate_limited":
         error = "rate_limited"
@@ -136,7 +143,7 @@ def score_case(
     )
     citation_expected = case.expect_work is not None
     citation_ok = (
-        any(cites(quote, case.expect_work, case.expect_anchor) for quote in quotes) if citation_expected else None
+        any(cites(quote, case.expect_work, case.expect_anchor, case.expect_text) for quote in quotes) if citation_expected else None
     )
     value = answer_value(first) or {}
     gates = value.get("gates") or {}

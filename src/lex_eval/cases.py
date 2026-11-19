@@ -19,6 +19,9 @@ class Case:
     question_type: str
     expect_work: str | None = None
     expect_anchor: str | None = None
+    # The words the quoted line must hold (Lex V4 quotes one line of the law, not the whole article): a quotation of the
+    # right article that does not hold them is the wrong line.
+    expect_text: str | None = None
     note: str = ""
     # The subset a case belongs to, for the gates that read one subset ("insurance": the 1997 insurance-contract law).
     suite: str = "general"
@@ -30,6 +33,8 @@ class Case:
             raise ValueError(f"{self.id}: an expected article needs its act (expect_work)")
         if self.expect_work is not None and self.expect_verdict != "answer":
             raise ValueError(f"{self.id}: only an answer names the act and article it quotes")
+        if self.expect_text is not None and self.expect_work is None:
+            raise ValueError(f"{self.id}: expected words need the act they are quoted from (expect_work)")
 
 
 def load_cases(path: str | Path) -> list[Case]:
