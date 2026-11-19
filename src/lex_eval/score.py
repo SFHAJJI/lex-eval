@@ -94,6 +94,12 @@ def quotes_of(envelope: dict[str, Any]) -> list[Quote]:
     return found
 
 
+def templates_of(envelope: dict[str, Any]) -> set[str]:
+    """The template ids of the sentences an answer says."""
+    value = answer_value(envelope) or {}
+    return {node["template_id"] for node in _walk(value.get("parts")) if node.get("kind") == "claim" and isinstance(node.get("template_id"), str)}
+
+
 def trace_of(envelope: dict[str, Any]) -> dict[str, Any]:
     value = answer_value(envelope) or {}
     trace = value.get("trace")
@@ -169,7 +175,7 @@ def score_case(
     chosen_work, chosen_article = chosen_of(first)
     return CaseResult(
         suite=case.suite,
-        outcome=outcome_of(case, verdict, quotes, citation_ok, error),
+        outcome=outcome_of(case, verdict, quotes, citation_ok, error, said=templates_of(first)),
         chosen_work=chosen_work,
         chosen_article=chosen_article,
         id=case.id,
@@ -198,9 +204,14 @@ OUTCOMES = ("right_article", "wrong_article", "not_found", "wrongly_refused", "r
 ANSWERS = frozenset({"answer", "answer_with_enrichment"})
 
 
-def outcome_of(case: Case, verdict: str | None, quotes: list[Quote], citation_ok: bool | None, error: str | None) -> str:
+def outcome_of(case: Case, verdict: str | None, quotes: list[Quote], citation_ok: bool | None, error: str | None,
+               said: set[str] | None = None) -> str:
     if error is not None:
         return "error"
+    # A sentence the case requires (the reader's own case: the general rule, and the line that says the text applies
+    # nothing to the reader) and the answer does not say: the wrong behaviour, whatever it quotes.
+    if case.expect_template is not None and verdict in ANSWERS and case.expect_template not in (said or set()):
+        return "wrong_behaviour"
     if case.expect_work is not None:
         if verdict in ANSWERS and citation_ok:
             return "right_article"

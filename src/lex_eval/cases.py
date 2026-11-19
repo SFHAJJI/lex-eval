@@ -22,6 +22,10 @@ class Case:
     # The words the quoted line must hold (Lex V4 quotes one line of the law, not the whole article): a quotation of the
     # right article that does not hold them is the wrong line.
     expect_text: str | None = None
+    # A sentence the answer must say, by its template id. Since 2026-11-19 a question worded for the reader's own case
+    # whose general rule the law states is answered by quoting that rule, and must say "caveat.not_your_case" (the text
+    # does not say how it applies to your situation): without that sentence the answer is not the right behaviour.
+    expect_template: str | None = None
     note: str = ""
     # The subset a case belongs to, for the gates that read one subset ("insurance": the 1997 insurance-contract law).
     suite: str = "general"

@@ -175,3 +175,16 @@ def test_an_article_written_as_a_number_meets_the_anchor_an_answer_carries():
     assert cites(quote, "/lu-legilux/loi-1997-07-27-n10", "art_26")
     assert not cites(quote, "/lu-legilux/loi-1997-07-27-n10", "27")
     assert not cites(quote, "/lu-legilux/loi-1997-07-27-n10", "126")
+
+
+def test_a_sentence_the_case_requires_and_the_answer_does_not_say_is_the_wrong_behaviour():
+    # 2026-11-19: a question worded for the reader's own case is answered with the general rule and must say that the
+    # text does not say how it applies to the reader.
+    from lex_eval.cases import Case
+    from lex_eval.score import outcome_of
+
+    case = Case(id="own", question="Mon assureur peut-il résilier mon contrat ?", expect_verdict="answer", question_type="own_case_general_rule",
+                expect_work="/lu-legilux/loi-1997-07-27-n10", expect_anchor="art_39", expect_template="caveat.not_your_case")
+    assert outcome_of(case, "answer", [], True, None, said={"caveat.not_your_case", "answer.rule"}) == "right_article"
+    assert outcome_of(case, "answer", [], True, None, said={"answer.rule"}) == "wrong_behaviour"
+    assert outcome_of(case, "refuse", [], None, None, said=set()) == "wrongly_refused"
